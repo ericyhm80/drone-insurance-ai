@@ -11,6 +11,7 @@ import pandas as pd
 from risk_engine import (
     score_drone_risk, explain_risk_factors,
     DRONE_RISK_DB, USAGE_RISK_MAP, ENV_RISK_MAP, PILOT_LEVEL_MAP, THIRD_PARTY_RATE_MAP,
+    POLICYHOLDER_TYPE_MAP, INDUSTRY_RISK_MAP,
 )
 from data_flywheel import (
     record_inquiry, get_flywheel_stats, get_recent_inquiries,
@@ -79,6 +80,40 @@ with tab1:
 
     with col_left:
         st.markdown("### 📝 投保信息")
+
+        with st.expander("🏢 投保人信息", expanded=True):
+            ph_col1, ph_col2 = st.columns(2)
+            with ph_col1:
+                policyholder_type = st.selectbox(
+                    "投保人类型",
+                    options=list(POLICYHOLDER_TYPE_MAP.keys()),
+                    index=0,
+                    help="投保人主体类型影响风险评估"
+                )
+                company_name = st.text_input(
+                    "企业名称（可选）",
+                    placeholder="输入企业全称用于企查查核验",
+                    help="填写后将通过企查查API自动核验企业风险"
+                )
+            with ph_col2:
+                industry = st.selectbox(
+                    "所属行业",
+                    options=list(INDUSTRY_RISK_MAP.keys()),
+                    index=0,
+                )
+                credit_code = st.text_input(
+                    "统一社会信用代码（可选）",
+                    placeholder="18位信用代码",
+                    max_chars=18,
+                    help="填写后可通过企查查查询企业信用报告"
+                )
+            operation_years = st.slider(
+                "⏳ 运营年限（年）",
+                min_value=0.0, max_value=20.0, value=3.0, step=0.5,
+                help="从事无人机业务的年限，越久风险越低"
+            )
+
+        st.markdown("---")
         with st.form("insurance_form"):
             r1, r2 = st.columns(2)
             with r1:
@@ -169,6 +204,9 @@ with tab1:
             previous_claims=previous_claims,
             battery_cycles=battery_cycles,
             fleet_size=fleet_size,
+            policyholder_type=policyholder_type,
+            industry=industry,
+            operation_years=operation_years,
         )
 
         record_inquiry(
@@ -312,19 +350,22 @@ with tab3:
     总保费 = 机身险(保额 × 2.5%-15%) + 三者险(保额 × 0.35‰-0.85‰) - 机队折扣
     ```
 
-    #### 🧩 9维度评分卡
+    #### 🧩 12维度评分卡（v0.4新增: 投保人信息3维度）
 
     | 维度 | 权重 | 说明 |
     |------|------|------|
-    | 设备风险 | ~15% | 型号基础事故率 + 电池老化 |
-    | 使用场景 | ~16% | 航拍/物流/公共安全/运载等 |
-    | 飞行环境 | ~13% | 城市密集度/水域/室内 |
-    | 操作员资质 | ~25% | CAAC/AOPA等级 |
-    | 飞行暴露量 | ~15% | 年飞行小时 |
-    | 历史理赔 | ~20% | 近3年出险次数 |
-    | 保额配置 | ~12% | 保额/设备价值比 |
-    | 三者险风险 | ~8% | 三者险保额对应风险敞口 |
-    | 机队折扣 | ~-5% | 批量投保折扣 |
+    | 设备风险 | ~10% | 型号基础事故率 + 电池老化 |
+    | 使用场景 | ~12% | 航拍/物流/公共安全/运载等 |
+    | 飞行环境 | ~10% | 城市密集度/水域/室内 |
+    | 操作员资质 | ~18% | CAAC/AOPA等级 |
+    | **投保人类型** | **~8%** | **政府/国企/民企/个人** |
+    | **行业风险** | **~8%** | **消防/警用/物流/培训等** |
+    | **运营年限** | **~5%** | **从业越久风险越低** |
+    | 飞行暴露量 | ~10% | 年飞行小时 |
+    | 历史理赔 | ~12% | 近3年出险次数 |
+    | 保额配置 | ~8% | 保额/设备价值比 |
+    | 三者险风险 | ~5% | 三者险保额对应风险敞口 |
+    | 机队折扣 | ~-4% | 批量投保折扣 |
 
     #### 💰 政府采购比价验证
 

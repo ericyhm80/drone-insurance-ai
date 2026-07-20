@@ -67,17 +67,50 @@ PILOT_LEVEL_MAP = {
 THIRD_PARTY_RATE_MAP = {
     500000:  0.35,    # 50万三者险
     1000000: 0.45,    # 100万
-    2000000: 0.55,    # 200万（武警标书基准）
+    2000000: 0.55,    # 200万（消防标书基准）
     5000000: 0.70,    # 500万
     10000000: 0.85,   # 1000万
 }
+
+# 投保人类型风险
+POLICYHOLDER_TYPE_MAP = {
+    "政府/事业单位":  {"factor": 0.8,  "desc": "管理规范，合规性强"},
+    "国有企业":       {"factor": 0.9,  "desc": "制度完善，风险意识好"},
+    "大型民营企业":   {"factor": 1.0,  "desc": "运营标准化，中等风险"},
+    "中小微企业":     {"factor": 1.2,  "desc": "管理松散，风险不一"},
+    "个人/个体飞手":  {"factor": 1.3,  "desc": "安全意识参差不齐"},
+}
+
+# 行业风险系数
+INDUSTRY_RISK_MAP = {
+    "政府公共安全":  {"factor": 0.8,  "desc": "任务有计划，操作规范"},
+    "消防救援":      {"factor": 0.9,  "desc": "高风险任务但训练有素"},
+    "警用执法":      {"factor": 0.85, "desc": "专业操作，管理严格"},
+    "电力/能源巡检": {"factor": 1.0,  "desc": "中等风险，任务明确"},
+    "农业/植保":     {"factor": 1.1,  "desc": "低空作业，环境多变"},
+    "物流配送":      {"factor": 1.3,  "desc": "城市飞行，频次高"},
+    "航拍/媒体":     {"factor": 1.0,  "desc": "场景多样，风险中等"},
+    "教育培训":      {"factor": 0.7,  "desc": "受控环境，风险最低"},
+    "测绘/勘察":     {"factor": 0.95, "desc": "专业领域，操作规范"},
+    "其他行业":      {"factor": 1.1,  "desc": "通用"},
+}
+
+# 运营年限风险
+def score_operation_years(years: float) -> float:
+    if years < 1: return 4     # 不足1年, 经验不足
+    if years < 3: return 2.5   # 1-3年
+    if years < 5: return 1.5   # 3-5年
+    return 0.5                  # 5年以上, 经验丰富
 
 
 def score_drone_risk(drone_model: str, usage: str, annual_hours: float,
                      pilot_level: str, env_type: str, hull_coverage: float,
                      third_party_limit: float = 2000000,
                      previous_claims: int = 0, battery_cycles: int = 0,
-                     fleet_size: int = 1) -> dict:
+                     fleet_size: int = 1,
+                     policyholder_type: str = "国有企业",
+                     industry: str = "政府公共安全",
+                     operation_years: float = 3) -> dict:
     """
     核心风险评估函数
     返回风险评分(0-100)、建议费率区间(‰)、详细因子分解
@@ -144,18 +177,33 @@ def score_drone_risk(drone_model: str, usage: str, annual_hours: float,
     coverage_score = min(coverage_score, 12)
 
     # ---- 8. 三者险风险 ----
-    # 三者险保额越高，整体风险敞口越大
+    # ---- 8. 三者险风险 ----
     tp_rate = THIRD_PARTY_RATE_MAP.get(third_party_limit, 0.55)
     tp_risk_score = min(tp_rate * 10, 8)  # 0-8分
 
-    # ---- 9. 机队批量折扣 ----
+    # ---- 9. 投保人类型风险 ----
+    ph_info = POLICYHOLDER_TYPE_MAP.get(policyholder_type, POLICYHOLDER_TYPE_MAP["国有企业"])
+    ph_factor = ph_info["factor"]
+    ph_risk_score = (ph_factor - 0.6) * 10  # 0.7 -> 1分, 1.3 -> 7分
+
+    # ---- 10. 行业风险 ----
+    ind_info = INDUSTRY_RISK_MAP.get(industry, INDUSTRY_RISK_MAP["其他行业"])
+    ind_factor = ind_info["factor"]
+    ind_risk_score = (ind_factor - 0.5) * 10  # 0.7->2分, 1.3->8分
+
+    # ---- 11. 运营年限风险 ----
+    op_score = score_operation_years(operation_years)
+
+    # ---- 12. 机队批量折扣 ----
     fleet_discount = max(0, (fleet_size - 1) * 0.5)  # 每多一架减0.5分
     fleet_discount = min(fleet_discount, 5)
 
     # ---- 综合评分 ----
     raw_score = (device_score + battery_risk + cargo_risk + usage_score +
                  env_score + pilot_score + exposure_score + claims_score +
-                 coverage_score + tp_risk_score - fleet_discount)
+                 coverage_score + tp_risk_score +
+                 ph_risk_score + ind_risk_score + op_score -
+                 fleet_discount)
 
     total_score = max(0, min(raw_score, 100))
 
@@ -234,12 +282,17 @@ def score_drone_risk(drone_model: str, usage: str, annual_hours: float,
             "历史理赔": round(claims_score, 1),
             "保额配置": round(coverage_score, 1),
             "三者险风险": round(tp_risk_score, 1),
+            "投保人类型": round(ph_risk_score, 1),
+            "行业风险": round(ind_risk_score, 1),
+            "运营年限": round(op_score, 1),
             "机队折扣": round(fleet_discount, 1),
         },
         "missing_info": missing_info,
         "hull_insured_value": hull_coverage,
         "third_party_limit": third_party_limit,
         "fleet_size": fleet_size,
+        "policyholder_type": ph_info["desc"],
+        "industry_risk_desc": ind_info["desc"],
     }
 
 
