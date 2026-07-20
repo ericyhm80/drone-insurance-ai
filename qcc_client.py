@@ -1,57 +1,51 @@
 """
-企查查 MCP 客户端封装
-=====================
-通过 agent.qcc.com MCP 协议查询企业信息
+企查查企业核验 API 客户端 v2
+============================
+接口: api.qichacha.com/EnterpriseInfo/Verify
 """
 
-import json
-import urllib.request
+import json, urllib.request, urllib.parse
 
-QCC_MCP_URL = "https://agent.qcc.com/mcp/v1"
+QCC_API_URL = "https://api.qichacha.com/EnterpriseInfo/Verify"
 QCC_API_KEY = "M0ldHwyR3w7l67oTbVzZJ1mlEfzgtW7wHNNXL9miGbp95oxU"
 
 
-def mcp_call(method: str, params: dict = None) -> dict:
-    """调用企查查MCP Server"""
-    payload = {
-        "jsonrpc": "2.0",
-        "method": method,
-        "params": params or {},
-        "id": 1,
-    }
-    req = urllib.request.Request(
-        QCC_MCP_URL,
-        data=json.dumps(payload).encode(),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {QCC_API_KEY}",
-        },
-        method="POST",
-    )
+def verify_company(company_name: str, credit_code: str = "") -> dict:
+    """核验企业信息"""
+    params = {"key": QCC_API_KEY, "searchKey": company_name}
+    if credit_code:
+        params["searchKey"] = credit_code
+    url = QCC_API_URL + "?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        return {"error": f"HTTP {e.code}: {e.reason}"}
+            data = json.loads(resp.read())
+        return data
     except Exception as e:
-        return {"error": str(e)}
+        return {"Status": "000", "Message": str(e), "Result": None}
 
 
-def get_company_info(company_name: str) -> dict:
-    """查询企业信息"""
-    return mcp_call("mcp__qcc-company__get_company_by_query", {
-        "keyword": company_name
-    })
-
-
-def get_company_risk(company_name: str) -> dict:
-    """查询企业风险扫描"""
-    return mcp_call("mcp__qcc-risk__get_company_risk_scan", {
-        "keyword": company_name
-    })
+def extract_enterprise_risk(qcc_result: dict) -> dict:
+    """将企查查返回数据转为风险评估因子"""
+    result = qcc_result.get("Result")
+    if not result:
+        return {
+            "risk_score": 0,
+            "risk_factors": {},
+            "note": qcc_result.get("Message", "无数据"),
+        }
+    # 这里后续根据企查查返回的具体字段做评分
+    # 示例字段: 经营状态、注册资本、成立日期、法人、股东等
+    return {
+        "risk_score": 0,
+        "risk_factors": {},
+        "raw_data": result,
+        "note": "已获取企业数据",
+    }
 
 
 if __name__ == "__main__":
-    # 测试查询
-    result = get_company_info("上海市消防救援总队")
+    import sys
+    name = sys.argv[1] if len(sys.argv) > 1 else "上海市消防救援总队"
+    result = verify_company(name)
     print(json.dumps(result, ensure_ascii=False, indent=2))

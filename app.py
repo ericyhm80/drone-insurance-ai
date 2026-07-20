@@ -13,6 +13,7 @@ from risk_engine import (
     DRONE_RISK_DB, USAGE_RISK_MAP, ENV_RISK_MAP, PILOT_LEVEL_MAP, THIRD_PARTY_RATE_MAP,
     POLICYHOLDER_TYPE_MAP, INDUSTRY_RISK_MAP,
 )
+from qcc_client import verify_company, extract_enterprise_risk
 from data_flywheel import (
     record_inquiry, get_flywheel_stats, get_recent_inquiries,
 )
@@ -209,6 +210,20 @@ with tab1:
             operation_years=operation_years,
         )
 
+        # 企查查企业核验（如果填写了企业名称）
+        qcc_status = None
+        if company_name:
+            with st.spinner(f"🔍 正在通过企查查核验 {company_name}..."):
+                qcc_result = verify_company(company_name, credit_code)
+                if qcc_result.get("Status") == "101":
+                    qcc_status = "⚠️ 企查查API Key未激活，企业核验暂不可用"
+                elif qcc_result.get("Status") != "200":
+                    qcc_status = f"ℹ️ 企查查查询: {qcc_result.get('Message', '未知')}"
+                else:
+                    qcc_status = "✅ 企业核验通过"
+                    result_data = qcc_result.get("Result", {})
+                    # 如果有企业数据，可以影响评分
+
         record_inquiry(
             drone_model=drone_model, usage=usage,
             annual_hours=annual_hours, pilot_level=pilot_level,
@@ -248,7 +263,11 @@ with tab1:
             <strong>三者险保费:</strong> ¥{result['third_party_premium_cny']:,.2f} |
             <strong>总保费:</strong> ¥{result['total_premium_min_cny']:,.2f} - ¥{result['total_premium_max_cny']:,.2f}
         </div>
-        """, unsafe_allow_html=True)
+        """ , unsafe_allow_html=True)
+
+        # 企查查核验状态
+        if qcc_status:
+            st.markdown(f"🔍 **企查查企业核验:** {qcc_status}")
 
         col_a, col_b = st.columns(2)
         with col_a:
