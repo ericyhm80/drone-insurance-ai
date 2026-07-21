@@ -346,6 +346,29 @@ with tab2:
     else:
         st.info("还没有询价记录，去「投保评估」Tab开始吧！")
 
+    st.markdown("---")
+    st.markdown("### 🔍 行业风控周报")
+    st.caption("每周自动采集无人机事故/黑飞/政策动态，辅助风险评估")
+
+    from drone_weekly_digest import get_weekly_digest
+    digest = get_weekly_digest()
+
+    if digest["accidents"]:
+        st.markdown("**📌 近期事故/案件**")
+        for a in digest["accidents"]:
+            st.markdown(f"- [{a.get('date','')[:10]}] {a['title'][:80]}")
+    else:
+        st.info("📌 本周暂无新增事故案例")
+
+    if digest["news"]:
+        st.markdown("**📰 行业动态**")
+        for n in digest["news"]:
+            st.markdown(f"- {n['title'][:80]}")
+    else:
+        st.info("📰 本周暂无新增行业动态")
+
+    st.caption(f"🔄 更新于 {digest['generated_at']}")
+
 with tab3:
     st.markdown("### 🧠 AI模型架构说明")
 
