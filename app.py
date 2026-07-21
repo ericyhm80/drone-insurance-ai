@@ -362,14 +362,24 @@ with tab2:
     if digest["accidents"]:
         st.markdown("**📌 近期事故/案件**")
         for a in digest["accidents"]:
-            st.markdown(f"- [{a.get('date','')[:10]}] {a['title'][:80]}")
+            title = a['title'][:70]
+            url = a.get('url', '')
+            if url:
+                st.markdown(f"- [{a.get('date','')[:10]}] [{title}]({url})")
+            else:
+                st.markdown(f"- [{a.get('date','')[:10]}] {title}")
     else:
         st.info("📌 本周暂无新增事故案例")
 
     if digest["news"]:
         st.markdown("**📰 行业动态**")
         for n in digest["news"]:
-            st.markdown(f"- {n['title'][:80]}")
+            title = n['title'][:70]
+            url = n.get('url', '')
+            if url:
+                st.markdown(f"- [{title}]({url})")
+            else:
+                st.markdown(f"- {title}")
     else:
         st.info("📰 本周暂无新增行业动态")
 
