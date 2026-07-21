@@ -557,24 +557,6 @@ with tab4:
     else:
         st.info("👆 上传保单数据后，校准按钮将自动激活")
 
-    # 晶世科保行业统计面板（核保不可见，仅内部使用）
-    with st.expander("📈 行业聚合统计（内部）", expanded=False):
-        st.caption("全市场脱敏数据汇总 — 仅晶世科保可见")
-        from calibration_store import get_industry_stats
-        stats = get_industry_stats()
-        if stats["companies"] > 0:
-            mc1, mc2, mc3 = st.columns(3)
-            mc1.metric("参与校准的公司", stats["companies"])
-            mc2.metric("累计校准次数", stats["total_calibrations"])
-            mc3.metric("市场平均赔付率", f"{stats['avg_loss_ratio']}%")
-            st.markdown("**偏差最大的维度（跨公司聚合）：**")
-            for d in stats["top_deviations"][:8]:
-                direction = "🔺偏高" if d["avg_correction"] > 0 else "🔻偏低"
-                st.write(f"  {direction} {d['dimension']}:{d['sub_key']} "
-                         f"({abs(d['avg_correction'])*100:.1f}% · {d['companies']}家公司)")
-        else:
-            st.info("尚无校准数据，等待核保上传")
-
     # 显示CSV模板
     with st.expander("📎 下载CSV模板"):
         st.markdown("**保单模板：**")
