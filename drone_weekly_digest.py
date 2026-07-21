@@ -7,7 +7,8 @@
 import json, os
 from datetime import datetime, timedelta
 
-DATA_DIR = os.path.expanduser("~/.drone_insurance")
+# 数据目录：项目仓库 data/（随git推送，服务器也能读到）
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 
 def get_weekly_digest() -> dict:
@@ -43,9 +44,23 @@ def get_weekly_digest() -> dict:
             news.append(n)
 
     return {
-        "accidents": accidents[-5:],  # 最多5条事故
-        "news": news[-8:],            # 最多8条行业动态
+        "accidents": accidents[-5:],
+        "news": news[-8:],
         "total_accidents": len(accidents),
         "total_news": len(news),
         "generated_at": now.strftime("%Y-%m-%d %H:%M"),
     }
+
+
+def get_procurement_update() -> dict:
+    """获取最新的采购标书动态"""
+    procurement_path = os.path.join(DATA_DIR, "..", "drone_procurement_data.md")
+    items = []
+    if os.path.exists(procurement_path):
+        with open(procurement_path, encoding="utf-8") as f:
+            content = f.read()
+        import re
+        for match in re.finditer(r"### (\d+\.\s*.+?)\n", content):
+            title = match.group(1).strip()
+            items.append(title)
+    return {"procurement_items": items[:3]}

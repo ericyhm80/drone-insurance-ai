@@ -350,8 +350,14 @@ with tab2:
     st.markdown("### 🔍 行业风控周报")
     st.caption("每周自动采集无人机事故/黑飞/政策动态，辅助风险评估")
 
-    from drone_weekly_digest import get_weekly_digest
+    from drone_weekly_digest import get_weekly_digest, get_procurement_update
     digest = get_weekly_digest()
+    procurement = get_procurement_update()
+
+    if procurement["procurement_items"]:
+        st.markdown("**📋 最新采购动态**")
+        for p in procurement["procurement_items"]:
+            st.markdown(f"- {p}")
 
     if digest["accidents"]:
         st.markdown("**📌 近期事故/案件**")
@@ -473,9 +479,10 @@ with tab3:
     | 来源 | 类型 | 用途 |
     |------|------|------|
     | [ccgp.gov.cn](https://www.ccgp.gov.cn) 中国政府采购网 | 官方招标公告 | 费率基准校准 |
-    | DJI Care Refresh 官方定价 | 消费级保险参考 | 费率下限验证 |
-    | ccgp.gov.cn 公告列表(10页) | 行业采购趋势 | 场景验证 |
-    | Google News RSS | 行业动态 | 政策信号追踪 |
+    | **Google News** 无人机事故/政策 | 实时新闻 | 风控周报 |
+    | **DJI Care Refresh** 官方定价 | 消费级保险参考 | 费率下限验证 |
+    | **平安产险/中再/Munich Re/Allianz** 行业报告 | 核保标准 | 16维评分卡架构参考 |
+    | **CAAC** 《无人驾驶航空器飞行管理暂行条例》 | 法规 | 拒保条件依据 |
 
     #### 🔄 每周更新
 
