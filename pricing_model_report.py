@@ -136,5 +136,5 @@ print('  3. DJI Care Refresh 官方定价 - 消费级基准')
 
 print()
 print('=' * 72)
-print('  v0.2 | 晶世科保 | 数据采集: 2026-07-20')
+print('  v0.8 | 晶世科保 | 参考平安/中再/Munich Re/Allianz行业标准')
 print('=' * 72)
