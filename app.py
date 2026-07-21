@@ -347,43 +347,56 @@ with tab2:
         st.info("还没有询价记录，去「投保评估」Tab开始吧！")
 
     st.markdown("---")
-    st.markdown("### 🔍 行业风控周报")
-    st.caption("每周自动采集无人机事故/黑飞/政策动态，辅助风险评估")
+    st.markdown("### 🔍 行业风控数据看板")
+    st.caption("晶世科保持续监测无人机事故/黑飞/政策动态，数据积累用于优化评分卡")
 
-    from drone_weekly_digest import get_weekly_digest, get_procurement_update
-    digest = get_weekly_digest()
-    procurement = get_procurement_update()
+    from drone_weekly_digest import get_risk_dashboard, get_data_coverage
+    dashboard = get_risk_dashboard()
+    coverage = get_data_coverage()
 
-    if procurement["procurement_items"]:
-        st.markdown("**📋 最新采购动态**")
-        for p in procurement["procurement_items"]:
-            st.markdown(f"- {p}")
+    # 第一行：数据覆盖范围
+    cov_cols = st.columns(len(coverage))
+    for i, (label, count) in enumerate(coverage.items()):
+        if isinstance(count, int):
+            cov_cols[i].metric(label, count)
+        elif isinstance(count, list):
+            cov_cols[i].markdown(f"**数据源**<br>{' · '.join(count)}", unsafe_allow_html=True)
 
-    if digest["accidents"]:
-        st.markdown("**📌 近期事故/案件**")
-        for a in digest["accidents"]:
-            title = a['title'][:70]
-            url = a.get('url', '')
-            if url:
-                st.markdown(f"- [{a.get('date','')[:10]}] [{title}]({url})")
-            else:
-                st.markdown(f"- [{a.get('date','')[:10]}] {title}")
+    st.markdown("---")
+
+    # 第二行：事故原因分布
+    if dashboard["cause_ranking"]:
+        st.markdown("**📊 事故原因分布**")
+        for item in dashboard["cause_ranking"]:
+            cause = item["cause"]
+            pct = int(item["pct"])
+            count = item["count"]
+            bar = "█" * (pct // 5) + "░" * (20 - pct // 5)
+            st.markdown(f"`{bar}` {cause} **{pct:.0f}%** ({count}起)")
     else:
-        st.info("📌 本周暂无新增事故案例")
+        st.info("事故数据收集中，累计一定量后展示趋势")
 
-    if digest["news"]:
-        st.markdown("**📰 行业动态**")
-        for n in digest["news"]:
-            title = n['title'][:70]
-            url = n.get('url', '')
-            if url:
-                st.markdown(f"- [{title}]({url})")
-            else:
-                st.markdown(f"- {title}")
-    else:
-        st.info("📰 本周暂无新增行业动态")
+    # 第三行：发现的趋势（纯文本结论，无具体新闻）
+    st.markdown("---")
+    st.markdown("**📈 近期风险趋势**")
+    trends = []
 
-    st.caption(f"🔄 更新于 {digest['generated_at']}")
+    # 根据数据生成趋势描述
+    for item in dashboard["cause_ranking"]:
+        if item["cause"] == "禁飞区/违规飞行" and item["count"] >= 2:
+            trends.append(f"⚠️ 违规飞行事件占比最高（{int(item['pct'])}%），执法力度持续加强")
+        if item["cause"] == "操作失误" and item["count"] >= 1:
+            trends.append(f"🔧 操作失误导致的炸机仍有发生，飞手培训需关注")
+        if item["cause"] == "机械/技术故障":
+            trends.append(f"🔋 机械/电池故障占比{int(item['pct'])}%，设备维护是关键风控点")
+
+    if not trends:
+        trends.append("📡 数据采集中，趋势分析将在积累更多数据后输出")
+
+    for t in trends:
+        st.markdown(t)
+
+    st.caption(f"🔄 更新于 {dashboard['generated_at']} · 覆盖周期: {dashboard['data_period']}")
 
 with tab3:
     st.markdown("### 🧠 AI模型架构说明")
