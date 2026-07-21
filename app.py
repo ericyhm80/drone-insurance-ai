@@ -96,9 +96,9 @@ with tab1:
                     help="投保人主体类型影响风险评估"
                 )
                 company_name = st.text_input(
-                    "企业名称（可选）",
-                    placeholder="输入企业全称用于企查查核验",
-                    help="填写后将通过企查查API自动核验企业风险"
+                    "企业名称（可选）" if policyholder_type != "个人/个体飞手" else "投保人姓名",
+                    placeholder="输入企业全称用于企查查核验" if policyholder_type != "个人/个体飞手" else "输入个人姓名",
+                    help="填写后将通过企查查API自动核验企业风险" if policyholder_type != "个人/个体飞手" else "填写个人身份信息"
                 )
             with ph_col2:
                 airworthiness = st.selectbox(
