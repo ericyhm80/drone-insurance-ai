@@ -108,10 +108,10 @@ with tab1:
                     help="无认证的自组装无人机直接拒保"
                 )
                 credit_code = st.text_input(
-                    "统一社会信用代码（可选）",
-                    placeholder="18位信用代码",
+                    "统一社会信用代码（可选）" if policyholder_type != "个人/个体飞手" else "身份证号",
+                    placeholder="18位信用代码" if policyholder_type != "个人/个体飞手" else "18位身份证号",
                     max_chars=18,
-                    help="填写后可通过企查查查询企业信用报告"
+                    help="填写后可通过企查查查询企业信用报告" if policyholder_type != "个人/个体飞手" else "保险实名制要求登记身份信息"
                 )
             r_new1, r_new2 = st.columns(2)
             with r_new1:
