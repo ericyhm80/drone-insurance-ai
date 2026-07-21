@@ -13,7 +13,7 @@ from risk_engine import (
     DRONE_RISK_DB, USAGE_RISK_MAP, ENV_RISK_MAP, PILOT_LEVEL_MAP, THIRD_PARTY_RATE_MAP,
     POLICYHOLDER_TYPE_MAP, INDUSTRY_RISK_MAP,
 )
-from qcc_client import verify_company, extract_enterprise_risk
+from qcc_client import verify_company, extract_risk_score
 from data_flywheel import (
     record_inquiry, get_flywheel_stats, get_recent_inquiries,
 )
