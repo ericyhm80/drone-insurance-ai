@@ -477,7 +477,7 @@ with tab4:
     <strong>📌 怎么做？</strong><br>
     1. 从保险公司系统导出 <strong>保单数据</strong> 和 <strong>理赔数据</strong>（CSV格式）<br>
     2. 拖入下方上传区 → AI自动对比 <strong>实际保费 vs 模型保费</strong><br>
-    3. 系统自动调整12维权重，输出<strong>校准报告</strong><br>
+    3. 系统自动调整<strong>16维</strong>权重，输出<strong>校准报告</strong><br>
     4. 校准后的模型可用于后续报价
     </div>
     """, unsafe_allow_html=True)
