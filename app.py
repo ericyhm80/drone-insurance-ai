@@ -219,8 +219,8 @@ with tab1:
         st.markdown("---")
         st.markdown("## 📊 评估结果")
 
-        # 传递校准数据中的公司标识（如有）
-        company_id = st.session_state.get("calibration_company", None)
+        # 传递匿名用户ID（用于加载私有校准）
+        anonymous_id = st.session_state.get("anonymous_id", None)
 
         result = score_drone_risk(
             drone_model=drone_model, usage=usage,
@@ -235,7 +235,7 @@ with tab1:
             obstacle_avoidance=obstacle_avoidance,
             bvlos_mode=bvlos_mode,
             violation_record=violation_record,
-            company_id=company_id,
+            company_id=anonymous_id,
         )
 
         # 企查查企业核验（如果填写了企业名称）
@@ -488,19 +488,11 @@ with tab4:
     policies = []
     claims = []
 
-    # 公司选择（核保选择自己的公司，核保不可见行业聚合）
-    company_id = st.selectbox(
-        "🏢 选择保险公司",
-        options=["_default", "pingan", "picc", "cpic", "picc_property", "other"],
-        format_func=lambda x: {
-            "_default": "其他/未选择", "pingan": "平安产险",
-            "picc": "中国人保", "cpic": "太平洋保险",
-            "picc_property": "中华联合", "other": "其他保险公司"
-        }.get(x, x),
-        index=0,
-        key="calibration_company",
-        help="选择您的保险公司，校准数据将按公司隔离存储"
-    )
+    # 自动分配匿名用户ID（核保不可见，用于数据隔离）
+    if "anonymous_id" not in st.session_state:
+        import uuid
+        st.session_state.anonymous_id = str(uuid.uuid4())[:8]
+    anonymous_id = st.session_state.anonymous_id
 
     with col_upload1:
         st.markdown("**📋 保单数据**")
@@ -533,8 +525,9 @@ with tab4:
             with st.spinner("正在对比实际保费与模型保费..."):
                 # 静默调用后台学习器（核保不可见）
                 from glm_learner import learn_from_policies
-                result = learn_from_policies(policies, claims, company_id=company_id)
+                result = learn_from_policies(policies, claims, company_id=anonymous_id)
 
+                # 记录公司名到日志（可选，用于行业统计聚合）
                 report = result.get("report", {})
                 st.balloons()
                 st.markdown("### 📊 校准报告")
