@@ -41,12 +41,15 @@ def _apply_corrections(dimension: str, sub_key: str, default_factor: float) -> f
         return default_factor * (1 + correction)
     return default_factor
 
-def _get_global_correction() -> float:
+def _get_global_correction(company_id: str = None) -> float:
     """获取全局赔付率修正"""
     if not _corrections_loaded:
         _load_corrections()
-    global_corr = _corrections.get("_global", {})
-    return global_corr.get("loss_ratio_correction", 0)
+    try:
+        from calibration_store import get_combined_correction
+        return get_combined_correction("_global", "loss_ratio_correction", company_id)
+    except Exception:
+        return 0
 
 
 # ============================================================
@@ -194,6 +197,7 @@ def score_drone_risk(drone_model: str, usage: str, annual_hours: float,
                      obstacle_avoidance: str = "前/后/下三向避障",
                      bvlos_mode: str = "VLOS（视距内飞行）",
                      violation_record: str = "无违规记录",
+                     company_id: str = None,  # 公司标识（用于加载私有校准）
                      ) -> dict:
     """
     核心风险评估函数 v0.8

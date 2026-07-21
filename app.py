@@ -219,6 +219,9 @@ with tab1:
         st.markdown("---")
         st.markdown("## 📊 评估结果")
 
+        # 传递校准数据中的公司标识（如有）
+        company_id = st.session_state.get("calibration_company", None)
+
         result = score_drone_risk(
             drone_model=drone_model, usage=usage,
             annual_hours=annual_hours, pilot_level=pilot_level,
@@ -232,13 +235,14 @@ with tab1:
             obstacle_avoidance=obstacle_avoidance,
             bvlos_mode=bvlos_mode,
             violation_record=violation_record,
+            company_id=company_id,
         )
 
         # 企查查企业核验（如果填写了企业名称）
         qcc_status = None
         if company_name:
             with st.spinner(f"🔍 正在通过企查查核验 {company_name}..."):
-                qcc_result = verify_company(company_name, credit_code)
+                qcc_result = verify_company(company_name)
                 if qcc_result.get("Status") == "101":
                     qcc_status = "⚠️ 企查查API Key未激活，企业核验暂不可用"
                 elif qcc_result.get("Status") != "200":
@@ -484,6 +488,20 @@ with tab4:
     policies = []
     claims = []
 
+    # 公司选择（核保选择自己的公司，核保不可见行业聚合）
+    company_id = st.selectbox(
+        "🏢 选择保险公司",
+        options=["_default", "pingan", "picc", "cpic", "picc_property", "other"],
+        format_func=lambda x: {
+            "_default": "其他/未选择", "pingan": "平安产险",
+            "picc": "中国人保", "cpic": "太平洋保险",
+            "picc_property": "中华联合", "other": "其他保险公司"
+        }.get(x, x),
+        index=0,
+        key="calibration_company",
+        help="选择您的保险公司，校准数据将按公司隔离存储"
+    )
+
     with col_upload1:
         st.markdown("**📋 保单数据**")
         policy_file = st.file_uploader(
@@ -515,7 +533,7 @@ with tab4:
             with st.spinner("正在对比实际保费与模型保费..."):
                 # 静默调用后台学习器（核保不可见）
                 from glm_learner import learn_from_policies
-                result = learn_from_policies(policies, claims)
+                result = learn_from_policies(policies, claims, company_id=company_id)
 
                 report = result.get("report", {})
                 st.balloons()
@@ -541,10 +559,28 @@ with tab4:
                     st.info(notes)
 
                 st.markdown("---")
-                st.caption("💡 校准结果仅在当前会话有效，刷新页面后恢复默认权重")
+                st.caption("📊 校准结果已持久化，后续报价将自动应用学习到的修正")
 
     else:
         st.info("👆 上传保单数据后，校准按钮将自动激活")
+
+    # 晶世科保行业统计面板（核保不可见，仅内部使用）
+    with st.expander("📈 行业聚合统计（内部）", expanded=False):
+        st.caption("全市场脱敏数据汇总 — 仅晶世科保可见")
+        from calibration_store import get_industry_stats
+        stats = get_industry_stats()
+        if stats["companies"] > 0:
+            mc1, mc2, mc3 = st.columns(3)
+            mc1.metric("参与校准的公司", stats["companies"])
+            mc2.metric("累计校准次数", stats["total_calibrations"])
+            mc3.metric("市场平均赔付率", f"{stats['avg_loss_ratio']}%")
+            st.markdown("**偏差最大的维度（跨公司聚合）：**")
+            for d in stats["top_deviations"][:8]:
+                direction = "🔺偏高" if d["avg_correction"] > 0 else "🔻偏低"
+                st.write(f"  {direction} {d['dimension']}:{d['sub_key']} "
+                         f"({abs(d['avg_correction'])*100:.1f}% · {d['companies']}家公司)")
+        else:
+            st.info("尚无校准数据，等待核保上传")
 
     # 显示CSV模板
     with st.expander("📎 下载CSV模板"):

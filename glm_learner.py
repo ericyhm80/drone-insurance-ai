@@ -8,7 +8,7 @@
 """
 import math
 from collections import defaultdict
-from calibration_store import save_corrections, log_calibration
+from calibration_store import save_company_corrections, log_calibration
 
 # 维度到风险评分的映射函数名（简化版模型模拟）
 DIMENSION_WEIGHT_KEYS = [
@@ -22,7 +22,8 @@ DIMENSION_WEIGHT_KEYS = [
 ]
 
 
-def learn_from_policies(policies: list[dict], claims: list[dict]) -> dict:
+def learn_from_policies(policies: list[dict], claims: list[dict],
+                         company_id: str = "_default") -> dict:
     """
     核心学习函数：分析保单数据，生成维度修正因子
 
@@ -96,12 +97,13 @@ def learn_from_policies(policies: list[dict], claims: list[dict]) -> dict:
             corrections["_global"] = {"loss_ratio_correction": loss_correction}
             adjustments["赔付率校正"] = round(loss_correction * 100, 1)
 
-    # Step 5: 保存修正因子
+    # Step 5: 保存修正因子（按公司隔离）
     if corrections:
-        save_corrections(corrections)
+        save_company_corrections(company_id, corrections)
 
     # Step 6: 记录校准日志
     log_calibration(
+        company_id=company_id,
         policy_count=len(policies),
         claim_count=len(claims),
         avg_error=round(avg_error * 100, 1),
