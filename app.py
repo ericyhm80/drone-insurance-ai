@@ -17,6 +17,10 @@ from qcc_client import verify_company, extract_enterprise_risk
 from data_flywheel import (
     record_inquiry, get_flywheel_stats, get_recent_inquiries,
 )
+from data_importer import (
+    parse_policy_csv, parse_claims_csv, calibrate_weights,
+    read_uploaded_file,
+)
 
 st.set_page_config(page_title="无人机保险 AI 核保引擎", page_icon="🚁", layout="wide")
 
@@ -74,7 +78,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-tab1, tab2, tab3 = st.tabs(["📋 投保评估", "📊 数据飞轮", "ℹ️ 模型说明"])
+tab1, tab2, tab3, tab4 = st.tabs(["📋 投保评估", "📊 数据飞轮", "ℹ️ 模型说明", "📥 数据校准"])
 
 with tab1:
     col_left, col_right = st.columns([3, 2])
@@ -417,6 +421,106 @@ with tab3:
     - 🔴 2026.03 40余家险企推出约 **180款** 低空保险产品
     - 🟢 **行业痛点**：数据不通、风险复杂是公认最大障碍
     """)
+
+with tab4:
+    st.markdown("### 📥 导入保险公司数据，自动校准模型")
+
+    st.markdown("""
+    <div class="calibration-note">
+    <strong>📌 怎么做？</strong><br>
+    1. 从保险公司系统导出 <strong>保单数据</strong> 和 <strong>理赔数据</strong>（CSV格式）<br>
+    2. 拖入下方上传区 → AI自动对比 <strong>实际保费 vs 模型保费</strong><br>
+    3. 系统自动调整12维权重，输出<strong>校准报告</strong><br>
+    4. 校准后的模型可用于后续报价
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_upload1, col_upload2 = st.columns(2)
+
+    policies = []
+    claims = []
+
+    with col_upload1:
+        st.markdown("**📋 保单数据**")
+        policy_file = st.file_uploader(
+            "上传保单CSV/Excel",
+            type=["csv", "xlsx"],
+            key="policy_upload",
+            help="字段: 保单号, 机型, 机身保额, 三者保额, 实际总保费, 投保人类型, 投保日期"
+        )
+        if policy_file:
+            raw = read_uploaded_file(policy_file.read(), policy_file.name)
+            policies = parse_policy_csv(raw)
+            st.success(f"已读取 {len(policies)} 条保单")
+
+    with col_upload2:
+        st.markdown("**💥 理赔数据**（可选）")
+        claims_file = st.file_uploader(
+            "上传理赔CSV/Excel",
+            type=["csv", "xlsx"],
+            key="claims_upload",
+            help="字段: 保单号, 出险日期, 赔付金额, 事故原因"
+        )
+        if claims_file:
+            raw = read_uploaded_file(claims_file.read(), claims_file.name)
+            claims = parse_claims_csv(raw)
+            st.success(f"已读取 {len(claims)} 条理赔")
+
+    if policies:
+        if st.button("🚀 开始校准", type="primary", use_container_width=True):
+            with st.spinner("正在对比实际保费与模型保费..."):
+                # 读取当前评分卡配置
+                current_weights = {
+                    "drone_risk": 0.10,
+                    "usage": 0.12,
+                    "env": 0.10,
+                    "pilot": 0.18,
+                    "policyholder_type": 0.08,
+                    "industry": 0.08,
+                    "operation_years": 0.05,
+                    "flight_exposure": 0.10,
+                    "claims_history": 0.12,
+                    "coverage_ratio": 0.08,
+                    "third_party_risk": 0.05,
+                    "fleet_discount": -0.04,
+                }
+                result = calibrate_weights(policies, claims, current_weights)
+
+                report = result.get("report", {})
+                st.balloons()
+                st.markdown("### 📊 校准报告")
+
+                mcol1, mcol2, mcol3 = st.columns(3)
+                mcol1.metric("📋 保单数", report.get("total_policies", 0))
+                mcol2.metric("💥 理赔数", report.get("total_claims", 0))
+                mcol3.metric("📈 赔付率", f"{report.get('loss_ratio', 0)}%")
+
+                adj = report.get("dimension_adjustments", {})
+                if adj:
+                    st.markdown("**需要调整的维度：**")
+                    for dim, pct in adj.items():
+                        direction = "🔺 上调" if pct > 0 else "🔻 下调"
+                        st.write(f"{direction} {dim}: {abs(pct):.0f}%")
+                else:
+                    st.success("✅ 当前模型与输入数据偏差在合理范围内")
+
+                notes = report.get("notes", "")
+                if notes:
+                    st.markdown("**校准建议：**")
+                    st.info(notes)
+
+                st.markdown("---")
+                st.caption("💡 校准结果仅在当前会话有效，刷新页面后恢复默认权重")
+
+    else:
+        st.info("👆 上传保单数据后，校准按钮将自动激活")
+
+    # 显示CSV模板
+    with st.expander("📎 下载CSV模板"):
+        st.markdown("**保单模板：**")
+        st.code("保单号,机型,机身保额,三者保额,实际总保费,投保人类型,投保日期\nP001,M350,650000,2000000,4500,政府,2025-03-15\nP002,M30T,350000,2000000,3200,企业,2025-06-20")
+        st.markdown("**理赔模板：**")
+        st.code("保单号,出险日期,赔付金额,事故原因\nP001,2025-08-12,12000,炸机\nP002,2025-09-03,3200,挂树")
 
 st.markdown("---")
 st.markdown("*晶世科保 · 无人机保险AI引擎 v0.2 · 数据校准: ccgp.gov.cn 上海消防特勤支队2026标书 · 🔄 每周自动巡检更新*")
