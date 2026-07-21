@@ -513,22 +513,9 @@ with tab4:
     if policies:
         if st.button("🚀 开始校准", type="primary", use_container_width=True):
             with st.spinner("正在对比实际保费与模型保费..."):
-                # 读取当前评分卡配置
-                current_weights = {
-                    "drone_risk": 0.10,
-                    "usage": 0.12,
-                    "env": 0.10,
-                    "pilot": 0.18,
-                    "policyholder_type": 0.08,
-                    "industry": 0.08,
-                    "operation_years": 0.05,
-                    "flight_exposure": 0.10,
-                    "claims_history": 0.12,
-                    "coverage_ratio": 0.08,
-                    "third_party_risk": 0.05,
-                    "fleet_discount": -0.04,
-                }
-                result = calibrate_weights(policies, claims, current_weights)
+                # 静默调用后台学习器（核保不可见）
+                from glm_learner import learn_from_policies
+                result = learn_from_policies(policies, claims)
 
                 report = result.get("report", {})
                 st.balloons()

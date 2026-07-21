@@ -1,5 +1,5 @@
-"""
-无人机保险AI核保引擎 - 风险评分与定价建议 v0.8
+
+"""无人机保险AI核保引擎 - 风险评分与定价建议 v0.8
 =====================================
 基于行业标准重构（参考来源: 平安产险四级风险体系、
 中再产险×平安UBI产品、Munich Re/Allianz/AIG核保框架、
@@ -13,6 +13,43 @@ CAAC《无人驾驶航空器飞行管理暂行条例》）
 """
 
 import math
+
+# ============================================================
+# <<< 静默加载已学习的校准修正因子 >>>
+# 从 calibration_store 读取持久化的修正因子并嵌入评分
+# 核保完全不可见
+# ============================================================
+_corrections_loaded = False
+_corrections = {}
+
+def _load_corrections():
+    global _corrections_loaded, _corrections
+    try:
+        from calibration_store import load_corrections
+        _corrections = load_corrections()
+    except Exception:
+        _corrections = {}
+    _corrections_loaded = True
+
+def _apply_corrections(dimension: str, sub_key: str, default_factor: float) -> float:
+    """对某维度的某个具体值应用修正因子"""
+    if not _corrections_loaded:
+        _load_corrections()
+    dim_corrections = _corrections.get(dimension, {})
+    correction = dim_corrections.get(str(sub_key), 0)
+    if correction != 0:
+        return default_factor * (1 + correction)
+    return default_factor
+
+def _get_global_correction() -> float:
+    """获取全局赔付率修正"""
+    if not _corrections_loaded:
+        _load_corrections()
+    global_corr = _corrections.get("_global", {})
+    return global_corr.get("loss_ratio_correction", 0)
+
+
+# ============================================================
 
 # ============================================================
 # 机型数据库
