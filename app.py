@@ -11,7 +11,8 @@ import pandas as pd
 from risk_engine import (
     score_drone_risk, explain_risk_factors,
     DRONE_RISK_DB, USAGE_RISK_MAP, ENV_RISK_MAP, PILOT_LEVEL_MAP, THIRD_PARTY_RATE_MAP,
-    POLICYHOLDER_TYPE_MAP, INDUSTRY_RISK_MAP,
+    POLICYHOLDER_TYPE_MAP,
+    AIRWORTHINESS_MAP, OBSTACLE_AVOIDANCE_MAP, BVLOS_MAP, VIOLATION_MAP,
 )
 from qcc_client import verify_company, extract_risk_score
 from data_flywheel import (
@@ -101,10 +102,11 @@ with tab1:
                     help="填写后将通过企查查API自动核验企业风险"
                 )
             with ph_col2:
-                industry = st.selectbox(
-                    "所属行业",
-                    options=list(INDUSTRY_RISK_MAP.keys()),
-                    index=0,
+                airworthiness = st.selectbox(
+                    "🏭 适航认证",
+                    options=list(AIRWORTHINESS_MAP.keys()),
+                    index=3,
+                    help="无认证的自组装无人机直接拒保"
                 )
                 credit_code = st.text_input(
                     "统一社会信用代码（可选）",
@@ -112,10 +114,26 @@ with tab1:
                     max_chars=18,
                     help="填写后可通过企查查查询企业信用报告"
                 )
-            operation_years = st.slider(
-                "⏳ 运营年限（年）",
-                min_value=0.0, max_value=20.0, value=3.0, step=0.5,
-                help="从事无人机业务的年限，越久风险越低"
+            r_new1, r_new2 = st.columns(2)
+            with r_new1:
+                obstacle_avoidance = st.selectbox(
+                    "🛡️ 避障能力",
+                    options=list(OBSTACLE_AVOIDANCE_MAP.keys()),
+                    index=1,
+                    help="全向避障可获费率折扣"
+                )
+            with r_new2:
+                bvlos_mode = st.selectbox(
+                    "📡 运行类型",
+                    options=list(BVLOS_MAP.keys()),
+                    index=0,
+                    help="BVLOS超视距飞行需加费50-100%"
+                )
+            violation_record = st.selectbox(
+                "⚠️ 违规飞行记录",
+                options=list(VIOLATION_MAP.keys()),
+                index=0,
+                help="有严重违规记录（如黑飞）直接拒保"
             )
 
         st.markdown("---")
@@ -210,8 +228,10 @@ with tab1:
             battery_cycles=battery_cycles,
             fleet_size=fleet_size,
             policyholder_type=policyholder_type,
-            industry=industry,
-            operation_years=operation_years,
+            airworthiness=airworthiness,
+            obstacle_avoidance=obstacle_avoidance,
+            bvlos_mode=bvlos_mode,
+            violation_record=violation_record,
         )
 
         # 企查查企业核验（如果填写了企业名称）
@@ -238,9 +258,10 @@ with tab1:
         )
 
         risk_class = ""
-        if result["total_score"] <= 25: risk_class = "risk-low"
-        elif result["total_score"] <= 50: risk_class = "risk-mid-low"
-        elif result["total_score"] <= 75: risk_class = "risk-mid-high"
+        if result["total_score"] <= 20: risk_class = "risk-low"
+        elif result["total_score"] <= 40: risk_class = "risk-mid-low"
+        elif result["total_score"] <= 60: risk_class = "risk-mid-high"
+        elif result["total_score"] <= 80: risk_class = "risk-high"
         else: risk_class = "risk-high"
 
         # 核心指标行
@@ -373,22 +394,45 @@ with tab3:
     总保费 = 机身险(保额 × 2.5%-15%) + 三者险(保额 × 0.35‰-0.85‰) - 机队折扣
     ```
 
-    #### 🧩 12维度评分卡（v0.4新增: 投保人信息3维度）
+    #### 🧩 16维度评分卡（v0.8 基于行业标准重构）
 
     | 维度 | 权重 | 说明 |
     |------|------|------|
-    | 设备风险 | ~10% | 型号基础事故率 + 电池老化 |
-    | 使用场景 | ~12% | 航拍/物流/公共安全/运载等 |
-    | 飞行环境 | ~10% | 城市密集度/水域/室内 |
-    | 操作员资质 | ~18% | CAAC/AOPA等级 |
-    | **投保人类型** | **~8%** | **政府/国企/民企/个人** |
-    | **行业风险** | **~8%** | **消防/警用/物流/培训等** |
-    | **运营年限** | **~5%** | **从业越久风险越低** |
-    | 飞行暴露量 | ~10% | 年飞行小时 |
-    | 历史理赔 | ~12% | 近3年出险次数 |
-    | 保额配置 | ~8% | 保额/设备价值比 |
-    | 三者险风险 | ~5% | 三者险保额对应风险敞口 |
-    | 机队折扣 | ~-4% | 批量投保折扣 |
+    | **设备风险** | ~8% | 型号基础事故率 |
+    | **电池老化** | ~5% | 循环次数/200 |
+    | **运载额外风险** | ~4% | 运载类机型特殊加费 |
+    | **适航认证** | ~8% | **无认证直接拒保**（行业标准） |
+    | **避障能力** | ~6% | 全向避障→折扣，无避障→加费 |
+    | **使用场景** | ~12% | 航拍/物流/公共安全/运载等 |
+    | **超视距(BVLOS)** | ~8% | **BVLOS加费50-100%** |
+    | **操作员资质** | ~12% | CAAC/AOPA等级，无证行业级→拒保 |
+    | **违规记录** | ~6% | **严重违规→拒保** |
+    | **飞行环境** | ~7% | 城市密集度/水域/室内 |
+    | **飞行暴露量** | ~6% | 年飞行小时 |
+    | **历史理赔** | ~10% | 近3年出险次数 |
+    | **保额配置** | ~6% | 保额/设备价值比 |
+    | **三者险风险** | ~4% | 保额对应风险敞口 |
+    | **投保人类型** | ~4% | 政府/国企/民企/个人 |
+    | **机队折扣** | ~-4% | 批量投保折扣 |
+
+    #### 📋 拒保条件（新增）
+
+    | 条件 | 依据 |
+    |------|------|
+    | ❌ 无适航认证（自组装/开源飞控） | Munich Re核保标准 — 认证机型损失率低40-60% |
+    | ❌ 严重违规飞行记录（黑飞/禁飞区） | Allianz/Ping An均为关键因子 |
+    | ❌ 无证操作行业级/运载级无人机 | CAAC《暂行条例》强制要求 |
+    | ⚠️ 评分>80 | 自动拒保，建议转再保 |
+
+    #### 📚 参考标准
+
+    | 来源 | 参考内容 |
+    |------|---------|
+    | **平安产险** 四级风险体系（第一财经） | 飞行器35%/场景30%/人员20%/环境15%权重分配 |
+    | **中再产险×平安** UBI产品（新华网） | 基于用户行为动态定价框架 |
+    | **Munich Re** 无人机保险白皮书 | 适航认证要求、分层再保模型 |
+    | **Allianz** AGCS核保标准 | 场景优先级权重、BVLOS加费50-100% |
+    | **CAAC** 《暂行条例》第12条 | 第三者责任险强制投保 |
 
     #### 💰 政府采购比价验证
 
