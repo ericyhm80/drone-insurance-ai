@@ -19,8 +19,7 @@ from data_flywheel import (
     record_inquiry, get_flywheel_stats, get_recent_inquiries,
 )
 from data_importer import (
-    parse_policy_csv, parse_claims_csv, calibrate_weights,
-    read_uploaded_file,
+    parse_policy_csv, parse_claims_csv, read_uploaded_file,
 )
 
 st.set_page_config(page_title="无人机保险 AI 核保引擎", page_icon="🚁", layout="wide")
